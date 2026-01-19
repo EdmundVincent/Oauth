@@ -10,15 +10,15 @@ import java.util.List;
 @RestController
 public class TestController {
 
-    @Autowired // 注入仓库工具
+    @Autowired // リポジトリツールの注入
     private UserRepository userRepository;
 
     @GetMapping("/hello")
     public String sayHello() {
-        return "Jarvis: System Online.";
+        return "System Online.";
     }
 
-    @GetMapping("/users") // 新增一个接口，查看所有用户
+    @GetMapping("/users") // ユーザー一覧を表示する新しいインターフェース
     public List<User> getAllUsers() {
         return userRepository.findAll();
     }

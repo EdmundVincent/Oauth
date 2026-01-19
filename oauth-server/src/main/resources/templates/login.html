@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
-    <title>OAuth 统一认证中心</title>
+    <title>OAuth 統合認証センター</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f0f2f5; }
         .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 350px; }
@@ -16,24 +16,27 @@
 </head>
 <body>
     <div class="card">
-        <h2>用户登录</h2>
+        <h2>ユーザーログイン</h2>
         
         <p th:if="${error}" class="error" th:text="${error}"></p>
 
         <div class="info" th:if="${client_id}">
-            授权请求来源：<br>
+            認可リクエスト元：<br>
             <strong th:text="${client_id}">Client ID</strong>
         </div>
         
         <form action="/login-action" method="post">
-            <input type="text" name="username" placeholder="请输入用户名 (admin)" required />
-            <input type="password" name="password" placeholder="请输入密码 (password)" required />
+            <input type="text" name="username" placeholder="ユーザー名を入力 (admin)" required />
+            <input type="password" name="password" placeholder="パスワードを入力 (password)" required />
             
             <input type="hidden" name="client_id" th:value="${client_id}" />
             <input type="hidden" name="redirect_uri" th:value="${redirect_uri}" />
+            <input type="hidden" name="scope" th:value="${scope}" />
+            <input type="hidden" name="code_challenge" th:value="${code_challenge}" />
+            <input type="hidden" name="code_challenge_method" th:value="${code_challenge_method}" />
             <input type="hidden" name="state" th:value="${state}" />
             
-            <button type="submit">立即授权并登录</button>
+            <button type="submit">認可してログイン</button>
         </form>
     </div>
 </body>

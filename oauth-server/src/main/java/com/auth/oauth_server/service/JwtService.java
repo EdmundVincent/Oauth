@@ -11,33 +11,55 @@ import java.util.Date;
 @Service
 public class JwtService {
 
-    // 1. 生成一个安全的随机密钥 (就像印钞票的防伪印章)
+    // 1. 安全なランダムキーを生成 (紙幣の偽造防止印のようなもの)
     private static final Key SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
 
-    // 2. 令牌有效期：1 小时
+    // 2. トークン有効期限：1時間
     private static final long EXPIRATION_TIME = 1000 * 60 * 60; 
 
-    /**
-     * 生成 JWT 令牌
-     */
-    public String generateToken(String username) {
+    // JWT トークンを生成 (標準クレームを含む)
+    public String generateToken(String username, String scope) {
         return Jwts.builder()
-                .setSubject(username) // 令牌是给谁的？
-                .setIssuedAt(new Date()) // 什么时候发的？
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME)) // 什么时候过期？
-                .signWith(SECRET_KEY) // 盖上防伪印章
+                .setSubject(username) // 誰のためのトークンか？
+                .setIssuer("oauth-server")
+                .setIssuedAt(new Date()) // いつ発行されたか？
+                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME)) // いつ期限切れになるか？
+                .claim("scope", scope)
+                .signWith(SECRET_KEY) // 偽造防止印を押す
+                .compact();
+    }
+    // JWT トークンを生成 (オーディエンスを含む)
+    public String generateToken(String username, String scope, String audience) {
+        return Jwts.builder()
+                .setSubject(username)
+                .setIssuer("oauth-server")
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
+                .claim("scope", scope)
+                .claim("aud", audience)
+                .signWith(SECRET_KEY)
                 .compact();
     }
     /**
-     * 解析 Token，取出里面的用户名
-     * 如果 Token 被篡改或过期，这里会直接报错
+     * トークンを解析し、中のユーザー名を取り出す
+     * トークンが改ざんされていたり期限切れの場合は、ここで直接エラーになります
      */
     public String extractUsername(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(SECRET_KEY)
                 .build()
-                .parseClaimsJws(token) // 解析并验证签名
+                .parseClaimsJws(token) // 署名を解析して検証
                 .getBody()
-                .getSubject(); //以此获取用户名 (sub)
+                .getSubject(); // ユーザー名 (sub) を取得
+    }
+
+    // scope を抽出
+    public String extractScope(String token) {
+        return (String) Jwts.parserBuilder()
+                .setSigningKey(SECRET_KEY)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .get("scope");
     }
 }
