@@ -1,23 +1,12 @@
-package com.auth.oauth_server;
+// 在 run 方法里，userRepository.save(admin) 后面加上：
 
-import com.auth.oauth_server.entity.User;
-import com.auth.oauth_server.repository.UserRepository;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
-@Configuration
-public class DataInitializer {
-
-    @Bean
-    public CommandLineRunner initDatabase(UserRepository userRepository) {
-        return args -> {
-            // 检查如果数据库为空，就写入一个测试用户
-            if (userRepository.count() == 0) {
-                User testUser = new User("admin", "123456");
-                userRepository.save(testUser);
-                System.out.println("Jarvis: Initialized test user: admin / 123456");
-            }
-        };
-    }
+// --- 初始化一个第三方应用 ---
+if (clientRepository.findByClientId("client-app").isEmpty()) {
+    Client app = new Client();
+    app.setClientId("client-app");
+    app.setClientSecret("123456"); // 实际生产中要加密存储
+    app.setRedirectUri("http://localhost:8080/callback"); // 假设这是第三方应用的回调
+    app.setAppName("Jarvis Demo App");
+    clientRepository.save(app);
+    System.out.println("初始化测试应用: client_id=client-app, secret=123456");
 }
