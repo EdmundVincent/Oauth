@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -21,13 +22,16 @@ public class DataInitializer implements CommandLineRunner {
     private UserRepository userRepository;
     @Autowired
     private ClientRepository clientRepository;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Override
     public void run(String... args) {
         // デフォルトユーザーの初期化
         Optional<User> admin = userRepository.findByUsername("admin");
         if (admin.isEmpty()) {
-            userRepository.save(new User("admin", "password"));
+            // パスワードをハッシュ化して保存
+            userRepository.save(new User("admin", passwordEncoder.encode("password")));
             log.info("デフォルトユーザーを初期化しました: admin/password");
         }
 
@@ -35,11 +39,13 @@ public class DataInitializer implements CommandLineRunner {
         if (clientRepository.findByClientId("client-app").isEmpty()) {
             Client app = new Client();
             app.setClientId("client-app");
-            app.setClientSecret("123456"); // デモ用
+            // クライアントシークレットもハッシュ化
+            app.setClientSecret(passwordEncoder.encode("123456"));
             app.setRedirectUri("http://localhost:8080/callback");
             app.setAppName("Demo App");
+            app.setScopes("read,write"); // 許可されたスコープ
             clientRepository.save(app);
-            log.info("テスト用アプリを初期化しました: client_id=client-app, secret=123456");
+            log.info("テスト用アプリを初期化しました: client_id=client-app, secret=123456, scopes=read,write");
         }
     }
 }

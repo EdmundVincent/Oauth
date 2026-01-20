@@ -53,6 +53,12 @@ public class AuthController {
             return "error"; // ここでは手抜きしてloginページを再利用するか、別途errorページを作成してください。現在はログインページに表示されます。
         }
 
+        // スコープ検証 (新規)
+        if (scope != null && !scope.isBlank() && !authService.validateScope(clientId, scope)) {
+            model.addAttribute("error", "要求されたスコープはこのクライアントに許可されていません！");
+            return "error";
+        }
+
         // 標準検証：認可コードモードのみサポート
         if (!"code".equalsIgnoreCase(responseType)) {
             model.addAttribute("error", "サポートされていないレスポンスタイプです。response_type=code である必要があります");
@@ -113,10 +119,8 @@ public class AuthController {
             return "redirect:/login?error=invalid_client";
         }
 
-        // ユーザーアカウントとパスワードの検証
-        Optional<User> userOptional = userRepository.findByUsername(username);
-
-        if (userOptional.isPresent() && userOptional.get().getPassword().equals(password)) {
+        // ユーザーアカウントとパスワードの検証 (アカウントロック対応)
+        if (authService.authenticateUser(username, password)) {
             // A. 認可コード (Code) の生成
             String code = authService.createAuthorizationCode(username, clientId, scope, codeChallenge, codeChallengeMethod, redirectUri);
 
@@ -128,7 +132,7 @@ public class AuthController {
             return new RedirectView(finalUrl);
         } else {
             // ログイン失敗。パラメータを持ち越さないと、ユーザーがリロードした際に誰に Code を送ればいいかわからなくなる
-            model.addAttribute("error", "アカウントまたはパスワードが間違っています！");
+            model.addAttribute("error", "アカウントまたはパスワードが間違っています（またはアカウントがロックされています）");
             model.addAttribute("client_id", clientId);
             model.addAttribute("redirect_uri", redirectUri);
             model.addAttribute("scope", scope);

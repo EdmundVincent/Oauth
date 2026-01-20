@@ -3,16 +3,26 @@ package com.auth.oauth_server.service;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 
 @Service
 public class JwtService {
 
-    // 1. 安全なランダムキーを生成 (紙幣の偽造防止印のようなもの)
-    private static final Key SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+    // 1. プロパティから秘密鍵を読み込む
+    @Value("${jwt.secret}")
+    private String secretKeyString;
+
+    // 秘密鍵オブジェクトを生成
+    private Key getSigningKey() {
+        byte[] keyBytes = secretKeyString.getBytes(StandardCharsets.UTF_8);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
 
     // 2. トークン有効期限：1時間
     private static final long EXPIRATION_TIME = 1000 * 60 * 60; 
@@ -25,7 +35,7 @@ public class JwtService {
                 .setIssuedAt(new Date()) // いつ発行されたか？
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME)) // いつ期限切れになるか？
                 .claim("scope", scope)
-                .signWith(SECRET_KEY) // 偽造防止印を押す
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256) // 偽造防止印を押す
                 .compact();
     }
     // JWT トークンを生成 (オーディエンスを含む)
@@ -37,7 +47,7 @@ public class JwtService {
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
                 .claim("scope", scope)
                 .claim("aud", audience)
-                .signWith(SECRET_KEY)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
     /**
@@ -46,7 +56,7 @@ public class JwtService {
      */
     public String extractUsername(String token) {
         return Jwts.parserBuilder()
-                .setSigningKey(SECRET_KEY)
+                .setSigningKey(getSigningKey())
                 .build()
                 .parseClaimsJws(token) // 署名を解析して検証
                 .getBody()
@@ -56,7 +66,7 @@ public class JwtService {
     // scope を抽出
     public String extractScope(String token) {
         return (String) Jwts.parserBuilder()
-                .setSigningKey(SECRET_KEY)
+                .setSigningKey(getSigningKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody()

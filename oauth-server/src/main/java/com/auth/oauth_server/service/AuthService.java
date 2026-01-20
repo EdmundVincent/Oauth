@@ -1,13 +1,18 @@
 package com.auth.oauth_server.service;
 
-import com.auth.oauth_server.repository.ClientRepository; // 记得导入上一部建好的仓库
+import com.auth.oauth_server.entity.User;
+import com.auth.oauth_server.repository.ClientRepository;
+import com.auth.oauth_server.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
@@ -18,33 +23,92 @@ public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
-    // 1. 注入档案室 (ClientRepository)
     @Autowired
     private ClientRepository clientRepository;
 
-    // 2. 存放授权码上下文 (内存存储)
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    // 2. 認可コードのコンテキストを保存 (メモリ内ストレージ)
     private final Map<String, AuthCodeData> codeStore = new ConcurrentHashMap<>();
 
-    // --- 删除：原来的 ALLOWED_REDIRECT_URIS 列表 (我们不再硬编码了) ---
-
     /**
-     * 新增方法：第一关检查
-     * 验证 "Client ID" 是否存在，以及 "Redirect URI" 是否匹配
+     * 新しいメソッド：第一段階チェック
+     * "Client ID" が存在するか、および "Redirect URI" が一致するか検証
      */
     public boolean validateClient(String clientId, String redirectUri) {
         return clientRepository.findByClientId(clientId)
                 .map(client -> {
-                    // 查到了这个应用，现在检查它传来的回调地址对不对
+                    // アプリが見つかりました。次にコールバックURLが正しいか確認します
                     boolean isUriValid = client.getRedirectUri().equals(redirectUri);
                     if (!isUriValid) {
-                        log.warn("Jarvis: 客户端 [{}] 试图使用非法回调地址: {}", clientId, redirectUri);
+                        log.warn("クライアント [{}] が不正なコールバックURLを使用しようとしました: {}", clientId, redirectUri);
                     }
                     return isUriValid;
                 })
                 .orElseGet(() -> {
-                    log.warn("Jarvis: 未知的客户端 ID: {}", clientId);
+                    log.warn("不明なクライアント ID: {}", clientId);
                     return false;
                 });
+    }
+
+    /**
+     * ユーザー認証（アカウントロック機能付き）
+     */
+    public boolean authenticateUser(String username, String rawPassword) {
+        return userRepository.findByUsername(username)
+                .map(user -> {
+                    // ロックチェック
+                    if (user.getLockTime() != null) {
+                        if (user.getLockTime().isAfter(LocalDateTime.now())) {
+                            log.warn("ロックされたアカウント [{}] がログインを試みました", username);
+                            return false;
+                        } else {
+                            // ロック解除
+                            user.setLockTime(null);
+                            user.setFailedAttempts(0);
+                            userRepository.save(user);
+                        }
+                    }
+
+                    // パスワード検証
+                    if (passwordEncoder.matches(rawPassword, user.getPassword())) {
+                        // 成功: 失敗回数をリセット
+                        user.setFailedAttempts(0);
+                        userRepository.save(user);
+                        return true;
+                    } else {
+                        // 失敗: 回数をインクリメント
+                        user.setFailedAttempts(user.getFailedAttempts() + 1);
+                        if (user.getFailedAttempts() >= 5) {
+                            user.setLockTime(LocalDateTime.now().plusMinutes(15)); // 15分ロック
+                            log.warn("アカウント [{}] は連続失敗のためロックされました", username);
+                        }
+                        userRepository.save(user);
+                        return false;
+                    }
+                })
+                .orElse(false);
+    }
+
+    /**
+     * スコープ検証
+     */
+    public boolean validateScope(String clientId, String requestedScope) {
+        return clientRepository.findByClientId(clientId)
+                .map(client -> {
+                    if (client.getScopes() == null || client.getScopes().isBlank()) {
+                        return false; // スコープ未定義の場合は拒否
+                    }
+                    // リクエストされたスコープが含まれているか確認
+                    // 単純化のため、部分一致ではなく完全一致またはリストに含まれるかで判定
+                    String[] allowedScopes = client.getScopes().split(",");
+                    return Arrays.asList(allowedScopes).contains(requestedScope);
+                })
+                .orElse(false);
     }
 
     /**
@@ -54,8 +118,8 @@ public class AuthService {
     public boolean authenticateClient(String clientId, String clientSecret) {
         return clientRepository.findByClientId(clientId)
                 .map(client -> {
-                    // 実際の本番環境ではパスワードを暗号化して比較すべき (例: BCrypt)。ここは平文でデモ。
-                    boolean isSecretValid = client.getClientSecret().equals(clientSecret);
+                    // BCrypt でハッシュ化されたシークレットを比較
+                    boolean isSecretValid = passwordEncoder.matches(clientSecret, client.getClientSecret());
                     if (!isSecretValid) {
                         log.warn("クライアント [{}] のシークレットが間違っています！", clientId);
                     }

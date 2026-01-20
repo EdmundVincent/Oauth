@@ -18,4 +18,15 @@ public class Client {
     private String clientSecret;  // 应用密钥 (如: 123456)
     private String redirectUri;   // 回调地址
     private String appName;       // 应用名称
+    private String scopes;        // 許可されたスコープ (カンマ区切り: "read,write")
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public String getClientSecret() {
+        return clientSecret;
+    }
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setClientSecret(String clientSecret) {
+        this.clientSecret = clientSecret;
+    }
 }
